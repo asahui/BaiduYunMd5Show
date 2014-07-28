@@ -1,10 +1,9 @@
 // ==UserScript==
 // @name        BaiduYunMd5Show
-// @namespace   BaiduYunMd5Show
-// @description BaiduYunMd5Show
+// @namespace   asahui
+// @description Show the md5 of files in the baidu pan
 // @include     http://pan.baidu.com/disk/home*
-// @run-at      document-start
-// @version     1
+// @version     0.1
 // @grant       none
 // ==/UserScript==
 window.addEventListener('afterscriptexecute', function (e) {

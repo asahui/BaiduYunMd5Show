@@ -1,3 +1,12 @@
+// ==UserScript==
+// @name        BaiduYunMd5Show
+// @namespace   asahui
+// @description Show the md5 of files in the baidu pan
+// @include     http://pan.baidu.com/disk/home*
+// @version     0.1
+// @grant       none
+// ==/UserScript==
+
 (function() {
 	// $ is global variant in pan.baidu.com
 	// var $ = require("common:widget/libs/jquerypacket.js");
@@ -25,6 +34,8 @@
         desc: 1,
         showempty: 0
 	};
+
+	var isSort = false;
 
 	requestParam.dir = hashApi.get("path") ? hashApi.get("path") : "/" ;
 	var lastPath  = "";
@@ -95,8 +106,14 @@
    		});
 
    		moduleListView.delegate(selector.titleCol, "click", function(e) {
+   			//console.log(e.target);
+   			//console.log($(e.target).closest(selector.titleCol));
+   			//console.log($(e.target).closest(selector.titleCol).find(selector.orderStatus));
+   			requestParam.page = 1;
+   			isSort = true;
    			requestParam.order = $(e.target).closest(selector.titleCol).data("key");
-   			requestParam.desc = $(e.target).closest(selector.titleCol).find(selector.orderStatus).hasClass("desc") ? 1 : 0;
+   			var isDesc = $(e.target).closest(selector.titleCol).find(selector.orderStatus).hasClass("desc") ? !0 : !1;
+   			isDesc ? requestParam.desc = 1 : delete requestParam.desc;
 
    		});
 
@@ -131,10 +148,11 @@
    			console.log(lastPath !== requestParam.dir);
    			console.log($(this).html());
    			// avoid sroll event fetching page 2 which is empty
-   			if ((lastPath !== requestParam.dir ||  requestParam.page > 1)
+   			if ((lastPath !== requestParam.dir ||  requestParam.page > 1 || isSort)
    				        && $(this).html().indexOf('已') > -1) {
    				getFileList(requestParam);
    				lastPath = requestParam.dir;
+   				isSort = false;
    			}
    		});
 	}
