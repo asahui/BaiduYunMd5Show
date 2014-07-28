@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>BaiduYunMd5Show by asahui</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>BaiduYunMd5Show</h1>
+        <h2></h2>
+        <a href="https://github.com/asahui/BaiduYunMd5Show" class="button"><small>View project on</small>GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h2>
+<a name="%E8%B0%83%E8%AF%95%E8%BF%87%E7%A8%8B" class="anchor" href="#%E8%B0%83%E8%AF%95%E8%BF%87%E7%A8%8B"><span class="octicon octicon-link"></span></a>调试过程</h2>
+
+<ul>
+<li>要使用Chrome的pretty print，然后调试时会自动使用这个formatted的js作为调试，所以会很好下断点</li>
+<li>下断点可以用几种：</li>
+<li>XHR下断点，找到有api/list的ajax请求，然后call stack跟踪上去，找到调用getFileAsync与render的调用</li>
+<li>Click下断点，这个发现被gesture插件截掉了，而且只跟到addevent handler，无多大意义</li>
+<li>
+<ul>
+<li>发现无素有自定义属性 <code>node-type="item"</code>，觉得这个元素竟然没有eventlistener，那一定自定义了一套event机制，给这个元素绑定了点击就调用函数的机制。</li>
+</ul>
+<ul>
+<li>所以搜索node-type="item"，发现去到<code>clouddisk-ui:widget/grid-view/grid-view.js</code>模块与<code>clouddisk-ui:widget/list-view/list-view.js</code>模块（其实这个模块后面定义很多delegate操作）。</li>
+<li>发现增量搜索node-type="item(注意没最后的")，有几个match，找到一点<code>node-type="item-copy"</code>，发现它在<code>c.delegate(o.newDirSure, "click", function(e) {}</code>里面，看到delegate这个词眼前一点，原来是这样绑定元素点击操作，上下一看也发现好多delegate操作。</li>
+<li>这时候想点击文件名字会进入文件，所以那个DOM一定也会有delegate了操作，在Element页面里找到每个item下面第一列有个<code>node-type="name-text"</code>，发现也是在那里。</li>
+<li>这次在list-view模块上下找到<code>c.delegate(t.itemBtn,"click",function(e){}</code>这个函数，这就是对点击item产生的操作，里面可以找到nameClick函数，进入下个断点，然后就是从这个断点的call stack上下各种分析最后得出很多东西，像是这个函数里的set是使用地址栏跳转路径。</li>
+<li>
+<p>delegate函数原来就是on函数</p>
+
+<pre><code>    delegate: function(e, t, n, r) {
+        return this.on(t, e, n, r)
+    }
+</code></pre>
+</li>
+<li>
+<p>on函数是自定义的</p>
+
+<pre><code>    O.fn.extend({on: function(e, n, r, i, o) {
+        var a, l;
+        if ("object" == typeof e) {
+            "string" != typeof n &amp;&amp; (r = r || n, n = t);
+            for (l in e)
+                this.on(l, n, r, e[l], o);
+            return this
+        }
+        if (null == r &amp;&amp; null == i ? (i = n, r = n = t) : null == i &amp;&amp; ("string" == typeof n ? (i = r, r = t) : (i = r, r = n, n = t)), i === !1)
+            i = s;
+        else if (!i)
+            return this;
+        return 1 === o &amp;&amp; (a = i, i = function(e) {
+            return O().off(e), a.apply(this, arguments)
+        }, i.guid = a.guid || (a.guid = O.guid++)), this.each(function() {
+            O.event.add(this, e, i, r, n)
+        })
+    }
+</code></pre>
+</li>
+</ul>
+</li>
+</ul><ol>
+<li>发现无素有自定义属性 <code>node-type="item"</code>，查找node-type时找到<code>"clouddisk-ui:widget/context-menu/context-menu.js"</code>这个模块，这个模块有委托各种click的回调函数</li>
+<li>明显在class=model-list-view这个div中不断变化元素，所以直接在这个元素上下DOM断点，停止后往Call Stack上找会找到<code>clouddisk-ui:widget/list-view/disk-home.js</code>模块的v.renderTitle
+同样，在这个div下面的list div下DOM断点，会找到v.render，也就是说这是点击后生成页面元素的操作</li>
+<li>一些常见的快捷键，像在Source页面用Ctrl+O查找文件，用Ctrl+Shift+O查找当前文件的函数</li>
+</ol><h2>
+<a name="%E6%88%90%E6%9E%9C" class="anchor" href="#%E6%88%90%E6%9E%9C"><span class="octicon octicon-link"></span></a>成果</h2>
+
+<p>render页面的代码在<code>speed-disk-home.js的define("clouddisk-ui:widget/list-view/disk-home.js", function(e, t, i) {}</code>函数里面
+require是全局函数，可以获取任务模块，使用那个模块exports的对象
+因为是自己定义委托<code>c.delegate(t.nameText, "click", function(e) {}</code>所以在Element页面发现DOM元素没有绑定event</p>
+
+<h2>
+<a name="%E8%B5%84%E6%96%99" class="anchor" href="#%E8%B5%84%E6%96%99"><span class="octicon octicon-link"></span></a>资料</h2>
+
+<p><a href="http://www.zhihu.com/question/20260762">有哪些 JS 调试技巧？</a>
+<a href="http://requirejs.org/">http://requirejs.org/</a>
+<a href="http://rfyiamcool.blog.51cto.com/1030776/1311206">百度云存储api实现文件分享及linux下的备份上传</a>
+<a href="http://developer.baidu.com/wiki/index.php?title=docs/pcs/rest/file_data_apis_list">百度云文件API列表</a>
+<a href="http://www.izhuyue.com/644.html">不同文件也可以有相同的MD5校验值？</a>
+<a href="http://www.choujone.com/json">在线JSON格式化</a></p>
+
+<hr><h1>
+<a name="%E8%A7%A3%E6%9E%90%E8%BF%87%E7%A8%8B" class="anchor" href="#%E8%A7%A3%E6%9E%90%E8%BF%87%E7%A8%8B"><span class="octicon octicon-link"></span></a>解析过程</h1>
+
+<h2>
+<a name="2014724%E4%B8%8B%E5%8D%88" class="anchor" href="#2014724%E4%B8%8B%E5%8D%88"><span class="octicon octicon-link"></span></a>2014.7.24下午</h2>
+
+<p>几个重要的API
+模块clouddisk-ui:widget/list-view/disk-home.js：</p>
+
+<ul>
+<li>render（对外接口）：触发render-crumbs-count与render-crumbs的trigger，根据参数不同调用getFileListByCategoryAsyc、searchFileListAsyc、getFileListAsyc，这些函数成功调用后会调用拿到数据列表的renderCallback，这个CallBack的注册见下面模块</li>
+<li>formatListData（非对外接口）：getFileListAsyc函数调用成功后调用的函数里面会调用formatListData，生成页面模板替换需要的元素</li>
+<li>setListRenderHandler(对外接口)：由其它模块调用，传入参数为函数，设置数据列表renderCallback为调用传入函数</li>
+</ul><p>模块clouddisk-ui:widget/list-view/list-view.js：(此模块没对外接口)</p>
+
+<ul>
+<li>y函数（被minified了）里的mdev.tmpl(s, e)就是对模板的数据渲染，可以看到这个模块里i.setListRenderHandler(y)将y注册为渲染Handler</li>
+</ul><hr><h2>
+<a name="2014724-%E6%99%9A%E4%B8%8A" class="anchor" href="#2014724-%E6%99%9A%E4%B8%8A"><span class="octicon octicon-link"></span></a>2014.7.24 晚上</h2>
+
+<p>分析了define与require函数，原理是两个全局变量，在一个function里定义，使用这个function的两个对象u={}、f={}，define会将模块名字放入u，而require会从f里面拿，拿不到才从u里面拿，这就是我后期无法重新定义已经有的模块的原因</p>
+
+<p>设置数据，使用common:widget/api-center/api-center.js模块中getFileListAsyc API可以取得dir目录下的文件信息，这个API就是ajax请求数据</p>
+
+<pre><code>params: {
+        num: 100,
+        page: 1,
+        dir: "/",
+        order: "time",
+        desc: 1,
+        showempty: 0
+    },
+</code></pre>
+
+<hr><h2>
+<a name="2014725%E6%97%A9%E4%B8%8A" class="anchor" href="#2014725%E6%97%A9%E4%B8%8A"><span class="octicon octicon-link"></span></a>2014.7.25早上</h2>
+
+<p>写出了Firefox GreaseMonkey可以运行的脚本</p>
+
+<pre><code>// ==UserScript==
+// @name        BaiduYunMd5Show
+// @namespace   BaiduYunMd5Show
+// @description BaiduYunMd5Show
+// @include     http://pan.baidu.com/disk/home*
+// @run-at      document-start
+// @version     1
+// @grant       none
+// ==/UserScript==
+window.addEventListener('afterscriptexecute', function (e) {
+    var src = e.target.src;
+    if (src.search(/speed-disk-home_9831c91\.js/) &gt; 0) {
+        /*这里用自己改过的define模块，主要改动三处
+        * h.list.cxt= {
+        *     mListView : {
+        *         width:{name:"60%",cols:["7%","10%","22%"]},title:{name:"文件名",cols:["大小","修改日期","MD5"]},
+        *         titleKey:{name:"name",cols:["size","time","md5"]},
+        *         isAppend:!1,list:[]
+        *     }
+        * }
+        * h.list.formatListData函数里面加入md5传值
+        * s.cols=[a.toFriendlyFileSize(i.size),a.parseDate(i.server_mtime),i.md5]
+        */
+        define("clouddisk-ui:widget/list-view/disk-home.js",function(e,t,i){...});
+    }
+}, true);
+</code></pre>
+
+<p>由于Chrome不支持beforescriptexecute afterscriptexecute这些event，所以脚本用不了，而且利用这种原理好像暂时没能想到解决方法</p>
+
+<h3>
+<a name="%E7%9B%B8%E5%85%B3%E8%B5%84%E6%96%99" class="anchor" href="#%E7%9B%B8%E5%85%B3%E8%B5%84%E6%96%99"><span class="octicon octicon-link"></span></a>相关资料</h3>
+
+<p><a href="http://www.experts-exchange.com/Programming/Languages/Scripting/JavaScript/Q_28036037.html">Timing of Greasemonkey Scripts</a>
+<a href="http://stackoverflow.com/questions/18323757/how-do-you-detect-that-a-script-was-loaded-and-executed-in-a-chrome-extension">How do you detect that a script was loaded <em>and</em> executed in a chrome extension?</a>
+<a href="https://code.google.com/p/chromium/issues/detail?id=333318">Remove support for BeforeLoad event</a>
+<a href="http://g.mozest.com/viewthread.php?tid=39064">关于自定义脚本在页面载入前执行的疑惑</a></p>
+
+<hr><h2>
+<a name="2014725%E4%B8%8B%E5%8D%88" class="anchor" href="#2014725%E4%B8%8B%E5%8D%88"><span class="octicon octicon-link"></span></a>2014.7.25下午</h2>
+
+<p>var jp = require("common:widget/libs/jquerypacket.js");  // 这是百度替换jQuery的自己的库，所以$与JQuery的会不一样
+var nameText = jp('span[node-type~="name-text"]');  // 这样拿取页面元素，返回估计是类似DOM或JQuery的对象
+var mlv = jp("div.module-list-view")  //这个对象有delegate函数，见上面分析
+mlv.delegate('span[node-type~="name-text"]', 'click', function(e) {}); //为nameText这些页面元素注册了click的处理，可以注册多个
+原始注册</p>
+
+<pre><code>c.delegate(t.nameText, "click", function(e) {
+        if (i.nameClick) {
+            var n = d(e.target);
+            if (n.hasClass("enabled")) {
+                e.stopPropagation();
+                var a = n.closest(t.item).attr("data-id");
+                i.nameClick(a)
+            }
+        }
+</code></pre>
+
+<p>调用clouddisk-ui:widget/list-view/disk-home.js模块的nameClick函数</p>
+
+<pre><code>nameClick: function(t) {
+        var i = f(t), a = e("common:widget/hash/hash.js");
+        if (i.isdir)
+            a.set("path", i.path);
+        else
+            switch (i.category) {
+                case 1:
+                    this.playVedio([t]);
+                    break;
+                case 2:
+                    this.musicPlay([t]);
+                    break;
+                case 3:
+                    this.imagePre([t]);
+                    break;
+                case 4:
+                    this.docReader([t]);
+                    break;
+                case 6:
+                    this.otherFile([t]);
+                    break;
+                case 7:
+                    this.torrent([t])
+            }
+    }
+</code></pre>
+
+<p>这里面的common:widget/hash/hash.js模块set调用其实改变浏览器地址栏</p>
+
+<p>在clouddisk-ui:widget/list-view/disk-home.js模块里面设置侦听地址栏，有变化会调用render函数，然后render函数如何取数据并渲染见上面</p>
+
+<pre><code>    //下面的r = require("common:widget/hash/hash.js");
+    r.listen("key, path, category/type, render-type", function() {
+        window.clearTimeout(e), e = window.setTimeout(function() {
+            var e = r.get("render-type"), t = r.get("key"), i = r.get("path"), a = r.get("category/type");
+            a === h.list.lastCategory &amp;&amp; t === h.list.lastKey &amp;&amp; i === h.list.lastPath &amp;&amp; e !== h.list.lastRenderType ? 
+              g.set("isOnlyRenderTypeChange", !0) : 
+              g.set("isOnlyRenderTypeChange", !1), h.list.params.page = 1, v.render(h.list.renderCallback), 
+              h.list.lastRenderType = e, h.list.lastKey = t, h.list.lastPath = i, h.list.lastCategory = a
+        }, 100)
+    })
+</code></pre>
+
+<p>common:widget/hash/hash.js模块代码不多，window.onhashchange与window.setInterval都是侦听地址栏</p>
+
+<pre><code>define("common:widget/hash/hash.js", function(n, o, t) {
+    n("common:widget/hash/jquery.hash.js");
+    var e = n("common:widget/libs/jquerypacket.js"), h = {}, i = {}, a = function(n, o) {
+        h[n] = h[n] || [], i[n] = c.get(n), "function" == typeof o &amp;&amp; h[n].push(o)
+    }, s = function(n) {
+        var o;
+        for (o = 0; o &lt; h[n].length; o++)
+            h[n][o]()
+    }, r = {path: "dir/path",key: "s/key"}, c = {del: function(n) {
+            var o = this.get(n);
+            o &amp;&amp; "" !== o &amp;&amp; this.set(n, null)
+        },get: function(n) {
+            var o, t = r[n];
+            return o = t ? e.hash(n) ? e.hash(n) : e.hash(t) : e.hash(n), "string" == typeof o &amp;&amp; (o = window.decodeURIComponent(o)), o
+        },set: function(n, o) {
+            return "string" == typeof o &amp;&amp; (o = window.encodeURIComponent(o)), e.hash(n, o)
+        },listen: function(n, o) {
+            var t = [];
+            "function" == typeof n &amp;&amp; (t.push("ALL"), o = n), "string" == typeof n &amp;&amp; (t = n.split(",")), t.forEach(function(n) {
+                n = n.trim(), a(n, o)
+            })
+        }};
+    h.ALL = [];
+    var f = function() {
+        var n, o;
+        for (n in i)
+            i.hasOwnProperty(n) &amp;&amp; (o = c.get(n), o !== i[n] &amp;&amp; (i[n] = o, s(n)));
+        s("ALL")
+    };
+    !function() {
+        var n = 100, o = window.location.hash;
+        "object" == typeof window.onhashchange || "undefined" == typeof window.onhashchange ? window.setInterval(function() {
+            var n = window.location.hash;
+            n !== o &amp;&amp; (f(), o = n)
+        }, n) : window.onhashchange = f
+    }(), t.exports = c
+});
+</code></pre>
+
+<h2>
+<a name="chrome-%E8%B0%83%E8%AF%95%E5%99%A8%E6%A0%B7%E5%BC%8F" class="anchor" href="#chrome-%E8%B0%83%E8%AF%95%E5%99%A8%E6%A0%B7%E5%BC%8F"><span class="octicon octicon-link"></span></a>Chrome 调试器样式</h2>
+
+<p><a href="https://github.com/manovotny/chrome-developer-tools-skins">manovotny/chrome-developer-tools-skins</a>
+<a href="https://github.com/ChrisKempson/Tomorrow-Theme">chriskempson/tomorrow-theme</a></p>
+
+<blockquote>
+<p>Written with <a href="https://stackedit.io/">StackEdit</a>.</p>
+</blockquote>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/asahui/BaiduYunMd5Show/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/asahui/BaiduYunMd5Show/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/asahui/BaiduYunMd5Show"></a> is maintained by <a href="https://github.com/asahui">asahui</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
