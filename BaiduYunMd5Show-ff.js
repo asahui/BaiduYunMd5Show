@@ -3,6 +3,7 @@
 // @namespace   asahui
 // @description Show the md5 of files in the baidu pan
 // @include     http://pan.baidu.com/disk/home*
+// @run-at      document-start
 // @version     0.1
 // @grant       none
 // ==/UserScript==
